@@ -21,6 +21,9 @@
 # Coverage
 /coverage/
 
+# Installer 
+
+/installer/
 
 # =========================================================
 # Native / C / C++ Build Outputs

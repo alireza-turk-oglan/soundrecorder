@@ -131,7 +131,7 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           const Icon(Icons.folder_rounded, size: 18, color: Colors.white54),
           const SizedBox(width: 10),
-          const Text('محل ذخیره : ', style: TextStyle(color: Colors.white70, fontSize: 13)),
+          const Text('پوشه پیشنهادی برای ذخیره : ', style: TextStyle(color: Colors.white70, fontSize: 13)),
           const SizedBox(width: 8),
           Expanded(
             child: FutureBuilder<String>(
@@ -319,11 +319,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   if (wavPath == null) return;
                   setState(() => _exporting = true);
                   try {
-                    final outPath = await rec.exportAs(_format, bitrateKbps: _bitrate);
-                    setState(() {
-                      _lastExportedPath = outPath;
-                      _exporting = false;
-                    });
+                    final outPath = await rec.saveRecordingAs(_format, bitrateKbps: _bitrate);
+                    setState(() => _exporting = false);
+                    if (outPath == null) {
+                      return;
+                    }
+                    setState(() => _lastExportedPath = outPath);
                     _lastExportTimer?.cancel();
                     _lastExportTimer = Timer(const Duration(seconds: 5), () {
                       if (!mounted) return;
@@ -346,7 +347,7 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54)),
                 SizedBox(width: 10),
-                Text('در حال تبدیل فرمت...', style: TextStyle(color: Colors.white54)),
+                Text('در حال ذخیره‌سازی...', style: TextStyle(color: Colors.white54)),
               ],
             ),
           ),
@@ -444,12 +445,21 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _openContainingFolder(String path) async {
     try {
       if (Platform.isWindows) {
-        await Process.run('explorer.exe', ['/select,$path']);
+        final file = File(path);
+
+        if (!await file.exists()) {
+          _showError('فایل پیدا نشد');
+          return;
+        }
+
+        final directory = file.parent.path;
+
+        await Process.run('explorer.exe', [directory]);
       } else {
         _showError('این قابلیت فقط در ویندوز پشتیبانی می‌شود');
       }
-    } catch (_) {
-      _showError('امکان باز کردن پوشه وجود ندارد');
+    } catch (e) {
+      _showError('امکان باز کردن پوشه وجود ندارد: $e');
     }
   }
 

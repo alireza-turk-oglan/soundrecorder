@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:shamsi_date/shamsi_date.dart';
 import '../services/recorder_controller.dart';
@@ -61,6 +62,7 @@ class RecordingsScreenState extends State<RecordingsScreen> {
   bool _loading = true;
   String? _error;
   String? _dirPath;
+  String? _tempPath;
   _SortMode _sortMode = _SortMode.dateNewest;
 
   @override
@@ -78,6 +80,8 @@ class RecordingsScreenState extends State<RecordingsScreen> {
     try {
       final rec = context.read<RecorderController>();
       final dirPath = await rec.resolveOutputDir();
+      final tempBase = await getTemporaryDirectory();
+      final tempPath = p.join(tempBase.path, 'WinAudioRecorderTemp');
       final dir = Directory(dirPath);
 
       final files = <File>[];
@@ -93,6 +97,7 @@ class RecordingsScreenState extends State<RecordingsScreen> {
       if (!mounted) return;
       setState(() {
         _dirPath = dirPath;
+        _tempPath = tempPath;
         _files = files;
         _loading = false;
       });
@@ -172,12 +177,21 @@ class RecordingsScreenState extends State<RecordingsScreen> {
   Future<void> _openContainingFolder(String path) async {
     try {
       if (Platform.isWindows) {
-        await Process.run('explorer.exe', ['/select,$path']);
+        final file = File(path);
+
+        if (!await file.exists()) {
+          _showError('فایل پیدا نشد');
+          return;
+        }
+
+        final directory = file.parent.path;
+
+        await Process.run('explorer.exe', [directory]);
       } else {
         _showError('این قابلیت فقط در ویندوز پشتیبانی می‌شود');
       }
-    } catch (_) {
-      _showError('امکان باز کردن پوشه وجود ندارد');
+    } catch (e) {
+      _showError('امکان باز کردن پوشه وجود ندارد: $e');
     }
   }
 
@@ -293,12 +307,25 @@ class RecordingsScreenState extends State<RecordingsScreen> {
                       const Icon(Icons.place_outlined, size: 14, color: Colors.white38),
                       const SizedBox(width: 6),
                       Expanded(
-                        child: Text(
-                          _dirPath!,
-                          textDirection: TextDirection.ltr,
-                          textAlign: TextAlign.left,
-                          style: const TextStyle(color: Colors.white38, fontSize: 12),
-                          overflow: TextOverflow.ellipsis,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              "Temp : ${_tempPath ?? ''}",
+                              textDirection: TextDirection.ltr,
+                              textAlign: TextAlign.left,
+                              style: const TextStyle(color: Colors.white38, fontSize: 12),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              "Saved : ${_dirPath!}",
+                              textDirection: TextDirection.ltr,
+                              textAlign: TextAlign.left,
+                              style: const TextStyle(color: Colors.white38, fontSize: 12),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ),
                       ),
                     ],

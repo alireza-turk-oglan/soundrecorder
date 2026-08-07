@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:window_size/window_size.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'services/recorder_controller.dart';
+import 'services/dll_downloader.dart';
 import 'screens/app_shell.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  setWindowMinSize(const Size(900, 900));
+  await DllDownloader.ensureDllExists();
   runApp(const RecorderApp());
 }
 

@@ -38,6 +38,11 @@ class RecorderController extends ChangeNotifier {
     return p.join(dir.path, 'WindowsAudioRecorder');
   }
 
+  Future<String> _resolveTempRecordingDir() async {
+    final tempBase = await getTemporaryDirectory();
+    return p.join(tempBase.path, 'WinAudioRecorderTemp');
+  }
+
   Future<void> pickOutputDirectory() async {
     final selected = await FilePicker.getDirectoryPath();
     if (selected != null && selected.isNotEmpty) {
@@ -63,15 +68,15 @@ class RecorderController extends ChangeNotifier {
 
     late final Directory recDir;
     try {
-      final basePath = await resolveOutputDir();
+      final basePath = await _resolveTempRecordingDir();
       recDir = Directory(basePath);
       if (!await recDir.exists()) {
         await recDir.create(recursive: true);
       }
     } on FileSystemException catch (e) {
-      throw Exception('ساخت پوشه ذخیره‌سازی ضبط ممکن نشد (${e.message}). دسترسی نوشتن در مسیر ذخیره‌سازی را بررسی کنید.');
+      throw Exception('ساخت پوشه موقت ضبط ممکن نشد (${e.message}). دسترسی نوشتن در پوشه Temp سیستم را بررسی کنید.');
     } catch (e) {
-      throw Exception('ساخت پوشه ذخیره‌سازی ضبط با خطا مواجه شد: $e');
+      throw Exception('ساخت پوشه موقت ضبط با خطا مواجه شد: $e');
     }
 
     final now = Jalali.now();
@@ -146,22 +151,51 @@ class RecorderController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<String> exportAs(AudioFormat format, {int bitrateKbps = 320}) async {
-    if (_currentWavPath == null) throw Exception('فایلی برای تبدیل وجود ندارد');
-    final wavPath = _currentWavPath!;
-    final destPath = wavPath.replaceAll('.wav', '.${format.extension}');
-    final result = await ExportService.convert(sourceWavPath: wavPath, destPath: destPath, format: format, bitrateKbps: bitrateKbps);
+  Future<String?> saveRecordingAs(AudioFormat format, {int bitrateKbps = 320}) async {
+    if (_currentWavPath == null) throw Exception('فایلی برای ذخیره وجود ندارد');
+    final tempWavPath = _currentWavPath!;
 
-    if (format != AudioFormat.wav) {
-      try {
-        final wavFile = File(wavPath);
-        if (await wavFile.exists()) {
-          await wavFile.delete();
-        }
-      } catch (_) {}
+    final now = Jalali.now();
+    final suggestedName = 'recording_${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}.${format.extension}';
+
+    final initialDir = (outputDir != null && outputDir!.isNotEmpty) ? outputDir : null;
+
+    final savePath = await FilePicker.saveFile(
+      dialogTitle: 'محل ذخیره فایل ضبط‌شده را انتخاب کنید',
+      fileName: suggestedName,
+      initialDirectory: initialDir,
+      type: FileType.custom,
+      allowedExtensions: [format.extension],
+    );
+
+    if (savePath == null || savePath.isEmpty) {
+      return null;
     }
 
-    return result;
+    var finalPath = savePath;
+    if (p.extension(finalPath).toLowerCase() != '.${format.extension}') {
+      finalPath = '$finalPath.${format.extension}';
+    }
+
+    String resultPath;
+    if (format == AudioFormat.wav) {
+      await File(tempWavPath).copy(finalPath);
+      resultPath = finalPath;
+    } else {
+      resultPath = await ExportService.convert(sourceWavPath: tempWavPath, destPath: finalPath, format: format, bitrateKbps: bitrateKbps);
+    }
+
+    try {
+      final tempFile = File(tempWavPath);
+      if (await tempFile.exists()) {
+        await tempFile.delete();
+      }
+    } catch (_) {}
+
+    outputDir = p.dirname(resultPath);
+    _currentWavPath = null;
+    notifyListeners();
+    return resultPath;
   }
 
   void _startPolling() {
