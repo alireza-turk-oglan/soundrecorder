@@ -1,0 +1,122 @@
+name: Build Windows Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      # ----------------------------------------
+      # Checkout source code
+      # ----------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ----------------------------------------
+      # Setup Flutter 3.44.8
+      # ----------------------------------------
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.8"
+          channel: stable
+          cache: true
+
+      # ----------------------------------------
+      # Flutter version
+      # ----------------------------------------
+      - name: Check Flutter version
+        run: flutter --version
+
+      # ----------------------------------------
+      # Get dependencies
+      # ----------------------------------------
+      - name: Flutter Pub Get
+        run: flutter pub get
+
+      # ----------------------------------------
+      # Build Windows Release
+      # ----------------------------------------
+      - name: Build Windows Release
+        run: flutter build windows --release
+
+      # ----------------------------------------
+      # Copy audio_engine.dll
+      # ----------------------------------------
+      - name: Copy audio_engine.dll
+        shell: pwsh
+        run: |
+          $source = "native/audio_engine/audio_engine.dll"
+          $destination = "build/windows/x64/runner/Release/audio_engine.dll"
+
+          if (-not (Test-Path $source)) {
+            Write-Error "audio_engine.dll not found at: $source"
+            exit 1
+          }
+
+          if (-not (Test-Path "build/windows/x64/runner/Release")) {
+            Write-Error "Flutter Release directory not found."
+            exit 1
+          }
+
+          Copy-Item $source $destination -Force
+
+          Write-Host "audio_engine.dll copied successfully."
+
+      # ----------------------------------------
+      # Verify build files
+      # ----------------------------------------
+      - name: Verify Release Files
+        shell: pwsh
+        run: |
+          $releasePath = "build/windows/x64/runner/Release"
+
+          Write-Host "Release directory:"
+          Get-ChildItem $releasePath
+
+          if (-not (Test-Path "$releasePath/soundrecorder.exe")) {
+            Write-Error "soundrecorder.exe not found!"
+            exit 1
+          }
+
+          if (-not (Test-Path "$releasePath/audio_engine.dll")) {
+            Write-Error "audio_engine.dll not found!"
+            exit 1
+          }
+
+      # ----------------------------------------
+      # Create ZIP
+      # ----------------------------------------
+      - name: Create ZIP
+        shell: pwsh
+        run: |
+          $releasePath = "build/windows/x64/runner/Release"
+          $zipPath = "soundrecorder-windows-x64.zip"
+
+          if (Test-Path $zipPath) {
+            Remove-Item $zipPath -Force
+          }
+
+          Compress-Archive `
+            -Path "$releasePath/*" `
+            -DestinationPath $zipPath `
+            -CompressionLevel Optimal
+
+          Write-Host "ZIP created:"
+          Get-Item $zipPath
+
+      # ----------------------------------------
+      # Create GitHub Release
+      # ----------------------------------------
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ github.run_number }}"
+          name: "SoundRecorder v${{ github.run_number }}"
+          files: |
+            soundrecorder-windows-x64.zip

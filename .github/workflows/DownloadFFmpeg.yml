@@ -1,0 +1,85 @@
+name: Download FFmpeg
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  download-ffmpeg:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create FFmpeg directory
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "assets/ffmpeg"
+
+      - name: Download FFmpeg
+        shell: pwsh
+        run: |
+          Invoke-WebRequest `
+            -Uri "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" `
+            -OutFile "ffmpeg.zip"
+
+      - name: Extract FFmpeg
+        shell: pwsh
+        run: |
+          Expand-Archive `
+            -Path "ffmpeg.zip" `
+            -DestinationPath "ffmpeg-temp" `
+            -Force
+
+          $ffmpeg = Get-ChildItem `
+            -Path "ffmpeg-temp" `
+            -Filter "ffmpeg.exe" `
+            -Recurse |
+            Select-Object -First 1
+
+          if (-not $ffmpeg) {
+            Write-Error "ffmpeg.exe پیدا نشد!"
+            exit 1
+          }
+
+          Copy-Item `
+            $ffmpeg.FullName `
+            "assets/ffmpeg/ffmpeg.exe" `
+            -Force
+
+      - name: Verify FFmpeg
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "assets/ffmpeg/ffmpeg.exe")) {
+            Write-Error "FFmpeg در مسیر موردنظر وجود ندارد!"
+            exit 1
+          }
+
+          Get-Item "assets/ffmpeg/ffmpeg.exe"
+
+      - name: Remove temporary files
+        shell: pwsh
+        run: |
+          Remove-Item "ffmpeg.zip" -Force
+          Remove-Item "ffmpeg-temp" -Recurse -Force
+
+      - name: Commit FFmpeg
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -f "assets/ffmpeg/ffmpeg.exe"
+
+          if (git diff --cached --quiet) {
+            Write-Host "No changes to commit."
+            exit 0
+          }
+
+          git commit -m "Add FFmpeg executable"
+          git push origin main
