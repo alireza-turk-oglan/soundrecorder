@@ -9,9 +9,7 @@ permissions:
   contents: write
 
 env:
-  # مسیر پوشه سورس موتور صدا داخل ریپو (اگر فرق داره، این رو عوض کن)
   AUDIO_ENGINE_DIR: native/audio_engine
-  # مسیر فایل build.iss داخل ریپو (اگر فرق داره، این رو عوض کن)
   ISS_PATH: build.iss
 
 jobs:
@@ -77,22 +75,12 @@ jobs:
 
           Write-Host "FFmpeg با موفقیت دانلود شد."
 
-      # ----------------------------------------
-      # مرحله ۲: نصب Visual Studio 2019 Build Tools (C++ workload)
-      # نکته: ران‌ر windows-2019 گیت‌هاب از ژوئن ۲۰۲۵ کاملاً حذف شده،
-      # پس روی windows-2022 اجرا می‌شود و VS2019 Build Tools به‌صورت
-      # دستی نصب می‌شود تا نزدیک‌ترین حالت به "VS2019 Developer Command Prompt" باشد.
-      # ----------------------------------------
       - name: Install VS2019 Build Tools (C++ workload)
         shell: pwsh
         run: |
           choco install visualstudio2019buildtools -y --package-parameters "--wait --quiet --norestart --nocache" --no-progress
           choco install visualstudio2019-workload-vctools -y --package-parameters "--wait --quiet --norestart --nocache --includeRecommended" --no-progress
 
-      # ----------------------------------------
-      # مرحله ۲ (ادامه): ساخت audio_engine.dll با cl.exe داخل VS2019 x64
-      # معادل build.bat اما از طریق vcvarsall.bat در اکشن
-      # ----------------------------------------
       - name: Build audio_engine.dll (VS2019, x64)
         shell: cmd
         run: |
@@ -124,7 +112,7 @@ jobs:
         run: flutter build windows --release
 
       # ----------------------------------------
-      # کپی audio_engine.dll به پوشه Release
+      # Copy audio_engine.dll To Release
       # ----------------------------------------
       - name: Copy audio_engine.dll
         shell: pwsh
@@ -194,10 +182,6 @@ jobs:
         shell: pwsh
         run: choco install innosetup -y --no-progress
 
-      # ----------------------------------------
-      # آماده‌سازی build.iss با مسیرهای واقعی این اجرای CI
-      # (مسیرهای هاردکد شده D:\Projects\... جایگزین می‌شوند)
-      # ----------------------------------------
       - name: Generate CI-ready Inno Setup script
         shell: pwsh
         run: |
