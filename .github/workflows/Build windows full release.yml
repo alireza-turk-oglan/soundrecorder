@@ -161,7 +161,7 @@ jobs:
         shell: pwsh
         run: |
           $releasePath = "build/windows/x64/runner/Release"
-          $zipPath = "soundrecorder-windows-x64.zip"
+          $zipPath = "soundrecorder-windows-x64-Portable.zip"
 
           if (Test-Path $zipPath) {
             Remove-Item $zipPath -Force
@@ -256,5 +256,5 @@ jobs:
           tag_name: "v${{ github.run_number }}"
           name: "SoundRecorder v${{ github.run_number }}"
           files: |
-            soundrecorder-windows-x64.zip
+            soundrecorder-windows-x64-Portable.zip
             ${{ env.INSTALLER_PATH }}
