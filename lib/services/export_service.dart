@@ -42,21 +42,13 @@ class ExportService {
     final ffmpegPath = p.join(supportDir.path, 'ffmpeg.exe');
     final file = File(ffmpegPath);
     if (!await file.exists()) {
-      final bytes = await File(
-        p.join('assets', 'ffmpeg', 'ffmpeg.exe'),
-      ).readAsBytes();
+      final bytes = await File(p.join('assets', 'ffmpeg', 'ffmpeg.exe')).readAsBytes();
       await file.writeAsBytes(bytes);
     }
     return ffmpegPath;
   }
 
-  /// [bitrateKbps] فقط برای فرمت‌های فشرده‌سازی‌شده (mp3/aac/ogg) استفاده می‌شود.
-  static Future<String> convert({
-    required String sourceWavPath,
-    required String destPath,
-    required AudioFormat format,
-    int bitrateKbps = 320,
-  }) async {
+  static Future<String> convert({required String sourceWavPath, required String destPath, required AudioFormat format, int bitrateKbps = 320}) async {
     if (format == AudioFormat.wav) {
       await File(sourceWavPath).copy(destPath);
       return destPath;
