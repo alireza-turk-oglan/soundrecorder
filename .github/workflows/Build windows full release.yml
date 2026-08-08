@@ -1,0 +1,276 @@
+# @format
+
+name: Build Windows Full Release (Installer + Portable)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  # مسیر پوشه سورس موتور صدا داخل ریپو (اگر فرق داره، این رو عوض کن)
+  AUDIO_ENGINE_DIR: native/audio_engine
+  # مسیر فایل build.iss داخل ریپو (اگر فرق داره، این رو عوض کن)
+  ISS_PATH: build.iss
+
+jobs:
+  build-windows:
+    runs-on: windows-2022
+
+    steps:
+      # ----------------------------------------
+      # Checkout source code
+      # ----------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ----------------------------------------
+      # Setup Flutter 3.44.8
+      # ----------------------------------------
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.8"
+          channel: stable
+          cache: true
+
+      - name: Check Flutter version
+        run: flutter --version
+
+      - name: Flutter Pub Get
+        run: flutter pub get
+
+      # ----------------------------------------
+      # مرحله ۱: بررسی و دانلود FFmpeg در صورت نبودن
+      # ----------------------------------------
+      - name: Check / Download FFmpeg
+        shell: pwsh
+        run: |
+          $ffmpegPath = "assets/ffmpeg/ffmpeg.exe"
+
+          if (Test-Path $ffmpegPath) {
+            Write-Host "FFmpeg از قبل موجود است، دانلود نمی‌شود."
+            exit 0
+          }
+
+          Write-Host "FFmpeg پیدا نشد، در حال دانلود..."
+          New-Item -ItemType Directory -Force -Path "assets/ffmpeg" | Out-Null
+
+          Invoke-WebRequest `
+            -Uri "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" `
+            -OutFile "ffmpeg.zip"
+
+          Expand-Archive -Path "ffmpeg.zip" -DestinationPath "ffmpeg-temp" -Force
+
+          $ffmpeg = Get-ChildItem -Path "ffmpeg-temp" -Filter "ffmpeg.exe" -Recurse | Select-Object -First 1
+
+          if (-not $ffmpeg) {
+            Write-Error "ffmpeg.exe در آرشیو دانلود شده پیدا نشد!"
+            exit 1
+          }
+
+          Copy-Item $ffmpeg.FullName $ffmpegPath -Force
+
+          Remove-Item "ffmpeg.zip" -Force
+          Remove-Item "ffmpeg-temp" -Recurse -Force
+
+          Write-Host "FFmpeg با موفقیت دانلود شد."
+
+      # ----------------------------------------
+      # مرحله ۲: نصب Visual Studio 2019 Build Tools (C++ workload)
+      # نکته: ران‌ر windows-2019 گیت‌هاب از ژوئن ۲۰۲۵ کاملاً حذف شده،
+      # پس روی windows-2022 اجرا می‌شود و VS2019 Build Tools به‌صورت
+      # دستی نصب می‌شود تا نزدیک‌ترین حالت به "VS2019 Developer Command Prompt" باشد.
+      # ----------------------------------------
+      - name: Install VS2019 Build Tools (C++ workload)
+        shell: pwsh
+        run: |
+          choco install visualstudio2019buildtools -y --package-parameters "--wait --quiet --norestart --nocache" --no-progress
+          choco install visualstudio2019-workload-vctools -y --package-parameters "--wait --quiet --norestart --nocache --includeRecommended" --no-progress
+
+      # ----------------------------------------
+      # مرحله ۲ (ادامه): ساخت audio_engine.dll با cl.exe داخل VS2019 x64
+      # معادل build.bat اما از طریق vcvarsall.bat در اکشن
+      # ----------------------------------------
+      - name: Build audio_engine.dll (VS2019, x64)
+        shell: cmd
+        run: |
+          set VCVARS="C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Auxiliary\Build\vcvarsall.bat"
+          if not exist %VCVARS% (
+            echo vcvarsall.bat not found at expected path!
+            exit /b 1
+          )
+          call %VCVARS% x64
+          cd %AUDIO_ENGINE_DIR%
+          cl /LD /EHsc /std:c++17 /O2 audio_engine.cpp /link ole32.lib uuid.lib /OUT:audio_engine.dll
+          if errorlevel 1 exit /b 1
+          echo audio_engine.dll built successfully.
+
+      - name: Verify audio_engine.dll
+        shell: pwsh
+        run: |
+          $dllPath = Join-Path $env:AUDIO_ENGINE_DIR "audio_engine.dll"
+          if (-not (Test-Path $dllPath)) {
+            Write-Error "audio_engine.dll ساخته نشد!"
+            exit 1
+          }
+          Write-Host "audio_engine.dll پیدا شد: $dllPath"
+
+      # ----------------------------------------
+      # مرحله ۳: ساخت Flutter Windows Release
+      # ----------------------------------------
+      - name: Build Windows Release
+        run: flutter build windows --release
+
+      # ----------------------------------------
+      # کپی audio_engine.dll به پوشه Release
+      # ----------------------------------------
+      - name: Copy audio_engine.dll
+        shell: pwsh
+        run: |
+          $source = Join-Path $env:AUDIO_ENGINE_DIR "audio_engine.dll"
+          $destination = "build/windows/x64/runner/Release/audio_engine.dll"
+
+          if (-not (Test-Path $source)) {
+            Write-Error "audio_engine.dll not found at: $source"
+            exit 1
+          }
+
+          if (-not (Test-Path "build/windows/x64/runner/Release")) {
+            Write-Error "Flutter Release directory not found."
+            exit 1
+          }
+
+          Copy-Item $source $destination -Force
+          Write-Host "audio_engine.dll copied successfully."
+
+      # ----------------------------------------
+      # بررسی فایل‌های خروجی Release
+      # ----------------------------------------
+      - name: Verify Release Files
+        shell: pwsh
+        run: |
+          $releasePath = "build/windows/x64/runner/Release"
+
+          Write-Host "Release directory:"
+          Get-ChildItem $releasePath
+
+          if (-not (Test-Path "$releasePath/soundrecorder.exe")) {
+            Write-Error "soundrecorder.exe not found!"
+            exit 1
+          }
+
+          if (-not (Test-Path "$releasePath/audio_engine.dll")) {
+            Write-Error "audio_engine.dll not found!"
+            exit 1
+          }
+
+      # ----------------------------------------
+      # مرحله ۴ (الف): ساخت ZIP پرتابل از نسخه Flutter
+      # ----------------------------------------
+      - name: Create Portable ZIP
+        shell: pwsh
+        run: |
+          $releasePath = "build/windows/x64/runner/Release"
+          $zipPath = "soundrecorder-windows-x64.zip"
+
+          if (Test-Path $zipPath) {
+            Remove-Item $zipPath -Force
+          }
+
+          Compress-Archive `
+            -Path "$releasePath/*" `
+            -DestinationPath $zipPath `
+            -CompressionLevel Optimal
+
+          Write-Host "ZIP created:"
+          Get-Item $zipPath
+
+      # ----------------------------------------
+      # مرحله ۴ (ب): نصب Inno Setup
+      # ----------------------------------------
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup -y --no-progress
+
+      # ----------------------------------------
+      # آماده‌سازی build.iss با مسیرهای واقعی این اجرای CI
+      # (مسیرهای هاردکد شده D:\Projects\... جایگزین می‌شوند)
+      # ----------------------------------------
+      - name: Generate CI-ready Inno Setup script
+        shell: pwsh
+        run: |
+          $issSource = $env:ISS_PATH
+          if (-not (Test-Path $issSource)) {
+            Write-Error "فایل build.iss در مسیر '$issSource' پیدا نشد. مقدار ISS_PATH را در بالای workflow اصلاح کن."
+            exit 1
+          }
+
+          $releasePath = Join-Path $env:GITHUB_WORKSPACE "build\windows\x64\runner\Release"
+          $installerOutDir = Join-Path $env:GITHUB_WORKSPACE "installer_output"
+          New-Item -ItemType Directory -Force -Path $installerOutDir | Out-Null
+
+          $content = Get-Content $issSource -Raw
+
+          # جایگزینی مسیر منبع فایل‌های اپ (D:\Projects\App\...\soundrecorder-windows-x64)
+          $content = $content -replace [regex]::Escape('D:\Projects\App\installer-soundrecorder\soundrecorder-windows-x64'), $releasePath
+
+          # جایگزینی مسیر خروجی نصب‌کننده
+          $content = $content -replace '(?m)^OutputDir=.*$', "OutputDir=$installerOutDir"
+
+          # اگر آیکون پیدا نشد (چون روی سیستم دیگری بود)، از آیکون پیش‌فرض فلاتر استفاده کن؛ اگر آن هم نبود، خط را حذف کن
+          $defaultIcon = Join-Path $env:GITHUB_WORKSPACE "windows\runner\resources\app_icon.ico"
+          if (Test-Path $defaultIcon) {
+            $content = $content -replace '(?m)^SetupIconFile=.*$', "SetupIconFile=$defaultIcon"
+          } else {
+            $content = $content -replace '(?m)^SetupIconFile=.*\r?\n', ""
+          }
+
+          $generatedIss = Join-Path $env:GITHUB_WORKSPACE "build.generated.iss"
+          Set-Content -Path $generatedIss -Value $content -Encoding UTF8
+
+          Write-Host "--- Generated .iss content ---"
+          Get-Content $generatedIss
+
+      # ----------------------------------------
+      # کامپایل نصب‌کننده با ISCC
+      # ----------------------------------------
+      - name: Build Installer with Inno Setup
+        shell: pwsh
+        run: |
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            Write-Error "ISCC.exe پیدا نشد!"
+            exit 1
+          }
+
+          & $iscc "build.generated.iss"
+
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "ساخت نصب‌کننده با خطا مواجه شد."
+            exit 1
+          }
+
+      - name: Verify Installer Output
+        shell: pwsh
+        run: |
+          $setupExe = Get-ChildItem "installer_output" -Filter "*.exe" -Recurse | Select-Object -First 1
+          if (-not $setupExe) {
+            Write-Error "فایل نصب‌کننده ساخته نشد!"
+            exit 1
+          }
+          Write-Host "Installer created: $($setupExe.FullName)"
+          "INSTALLER_PATH=$($setupExe.FullName)" >> $env:GITHUB_ENV
+
+      # ----------------------------------------
+      # مرحله ۵: ساخت GitHub Release با هر دو فایل (نصبی + پرتابل)
+      # ----------------------------------------
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ github.run_number }}"
+          name: "SoundRecorder v${{ github.run_number }}"
+          files: |
+            soundrecorder-windows-x64.zip
+            ${{ env.INSTALLER_PATH }}
