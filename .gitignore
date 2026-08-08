@@ -37,11 +37,7 @@
 *.pdb
 
 # Ignore all files inside audio_engine
-/native/audio_engine/*
 
-# But keep the required DLL
-!/native/audio_engine/
-!/native/audio_engine/audio_engine.dll
 
 #==========================================================
 # Ffmpeg
