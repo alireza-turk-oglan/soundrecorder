@@ -40,7 +40,7 @@ jobs:
         run: flutter pub get
 
       # ----------------------------------------
-      # مرحله ۱: بررسی و دانلود FFmpeg در صورت نبودن
+      #  بررسی و دانلود FFmpeg در صورت نبودن
       # ----------------------------------------
       - name: Check / Download FFmpeg
         shell: pwsh
@@ -106,7 +106,7 @@ jobs:
           Write-Host "audio_engine.dll پیدا شد: $dllPath"
 
       # ----------------------------------------
-      # مرحله ۳: ساخت Flutter Windows Release
+      #  Creat Flutter Windows Release
       # ----------------------------------------
       - name: Build Windows Release
         run: flutter build windows --release
@@ -155,7 +155,7 @@ jobs:
           }
 
       # ----------------------------------------
-      # مرحله ۴ (الف): ساخت ZIP پرتابل از نسخه Flutter
+      # ساخت پرتابل برنامه
       # ----------------------------------------
       - name: Create Portable ZIP
         shell: pwsh
@@ -176,7 +176,7 @@ jobs:
           Get-Item $zipPath
 
       # ----------------------------------------
-      # مرحله ۴ (ب): نصب Inno Setup
+      # ساخت فایل نصبی Inno Setup
       # ----------------------------------------
       - name: Install Inno Setup
         shell: pwsh
@@ -248,7 +248,7 @@ jobs:
           "INSTALLER_PATH=$($setupExe.FullName)" >> $env:GITHUB_ENV
 
       # ----------------------------------------
-      # مرحله ۵: ساخت GitHub Release با هر دو فایل (نصبی + پرتابل)
+      # Creat GitHub Release (نصبی + پرتابل)
       # ----------------------------------------
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
