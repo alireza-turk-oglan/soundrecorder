@@ -23,6 +23,12 @@
 
 ---
 
+## ScreenShot
+
+![Screenshot](ScreenShot/01.png) ![Screenshot](ScreenShot/02.png)
+
+---
+
 <div dir="rtl">
 
 ## 📥 دریافت برنامه
