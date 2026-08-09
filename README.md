@@ -41,12 +41,12 @@
     <tr>
       <td>🖥️ <strong>Installer</strong></td>
       <td>نصب آسان و سریع برنامه روی سیستم</td>
-      <td><a href="../../releases/latest">⬇️ دانلود آخرین نسخه</a></td>
+      <td><a href="../../releases/latest/download/soundrecorder-windows-x64-Portable.zip">⬇️ دانلود آخرین نسخه</a></td>
     </tr>
     <tr>
       <td>🎒 <strong>Portable</strong></td>
       <td>نسخه قابل حمل، بدون نیاز به نصب</td>
-      <td><a href="../../releases/latest">📦 دانلود نسخه Portable</a></td>
+      <td><a href="../../releases/latest/download/soundrecorder.exe">📦 دانلود نسخه Portable</a></td>
     </tr>
   </tbody>
 </table>
