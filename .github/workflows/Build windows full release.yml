@@ -4,6 +4,12 @@ name: Build Windows Release (Installer + Portable)
 
 on:
   workflow_dispatch:
+  inputs:
+    version:
+      description: "Release version"
+      required: true
+      default: "1"
+      type: string
 
 permissions:
   contents: write
@@ -254,8 +260,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: "v${{ github.run_number }}"
-          name: "SoundRecorder v${{ github.run_number }}"
+          tag_name: "v${{ inputs.version }}"
+          name: "SoundRecorder v${{ inputs.version }}"
           files: |
             soundrecorder-windows-x64-Portable.zip
             ${{ env.INSTALLER_PATH }}
