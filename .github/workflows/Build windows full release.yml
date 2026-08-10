@@ -54,11 +54,11 @@ jobs:
           $ffmpegPath = "assets/ffmpeg/ffmpeg.exe"
 
           if (Test-Path $ffmpegPath) {
-            Write-Host "FFmpeg از قبل موجود است، دانلود نمی‌شود."
+            Write-Host "FFmpeg Already available, cannot be downloaded."
             exit 0
           }
 
-          Write-Host "FFmpeg پیدا نشد، در حال دانلود..."
+          Write-Host "FFmpeg Not found, downloading..."
           New-Item -ItemType Directory -Force -Path "assets/ffmpeg" | Out-Null
 
           Invoke-WebRequest `
@@ -70,7 +70,7 @@ jobs:
           $ffmpeg = Get-ChildItem -Path "ffmpeg-temp" -Filter "ffmpeg.exe" -Recurse | Select-Object -First 1
 
           if (-not $ffmpeg) {
-            Write-Error "ffmpeg.exe در آرشیو دانلود شده پیدا نشد!"
+            Write-Error "ffmpeg.exe Not found in the downloaded archive!"
             exit 1
           }
 
@@ -79,7 +79,7 @@ jobs:
           Remove-Item "ffmpeg.zip" -Force
           Remove-Item "ffmpeg-temp" -Recurse -Force
 
-          Write-Host "FFmpeg با موفقیت دانلود شد."
+          Write-Host "FFmpeg Downloaded successfully."
 
       - name: Install VS2019 Build Tools (C++ workload)
         shell: pwsh
@@ -109,7 +109,7 @@ jobs:
             Write-Error "audio_engine.dll ساخته نشد!"
             exit 1
           }
-          Write-Host "audio_engine.dll پیدا شد: $dllPath"
+          Write-Host "audio_engine.dll Found : $dllPath"
 
       # ----------------------------------------
       #  Creat Flutter Windows Release
@@ -193,7 +193,7 @@ jobs:
         run: |
           $issSource = $env:ISS_PATH
           if (-not (Test-Path $issSource)) {
-            Write-Error "فایل build.iss در مسیر '$issSource' پیدا نشد. مقدار ISS_PATH را در بالای workflow اصلاح کن."
+            Write-Error "The file build.iss was not found in the path '$issSource'. Correct the ISS_PATH value at the top of the workflow."
             exit 1
           }
 
@@ -203,13 +203,13 @@ jobs:
 
           $content = Get-Content $issSource -Raw
 
-          # جایگزینی مسیر منبع فایل‌های اپ (D:\Projects\App\...\soundrecorder-windows-x64)
+          # Replacing the source path of app files (D:\Projects\App\...\soundrecorder-windows-x64)
           $content = $content -replace [regex]::Escape('D:\Projects\App\installer-soundrecorder\soundrecorder-windows-x64'), $releasePath
 
-          # جایگزینی مسیر خروجی نصب‌کننده
+          # Replacing the installer output path
           $content = $content -replace '(?m)^OutputDir=.*$', "OutputDir=$installerOutDir"
 
-          # اگر آیکون پیدا نشد (چون روی سیستم دیگری بود)، از آیکون پیش‌فرض فلاتر استفاده کن؛ اگر آن هم نبود، خط را حذف کن
+          # If the icon is not found (because it was on another system), use the default Flutter icon; if that is not there either, delete the line.
           $defaultIcon = Join-Path $env:GITHUB_WORKSPACE "windows\runner\resources\app_icon.ico"
           if (Test-Path $defaultIcon) {
             $content = $content -replace '(?m)^SetupIconFile=.*$', "SetupIconFile=$defaultIcon"
@@ -231,14 +231,14 @@ jobs:
         run: |
           $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
           if (-not (Test-Path $iscc)) {
-            Write-Error "ISCC.exe پیدا نشد!"
+            Write-Error "ISCC.exe Not found!"
             exit 1
           }
 
           & $iscc "build.generated.iss"
 
           if ($LASTEXITCODE -ne 0) {
-            Write-Error "ساخت نصب‌کننده با خطا مواجه شد."
+            Write-Error "An error occurred while building the installer."
             exit 1
           }
 
@@ -247,7 +247,7 @@ jobs:
         run: |
           $setupExe = Get-ChildItem "installer_output" -Filter "*.exe" -Recurse | Select-Object -First 1
           if (-not $setupExe) {
-            Write-Error "فایل نصب‌کننده ساخته نشد!"
+            Write-Error "The installer file could not be created!"
             exit 1
           }
           Write-Host "Installer created: $($setupExe.FullName)"
@@ -264,3 +264,5 @@ jobs:
           files: |
             soundrecorder-windows-x64-Portable.zip
             ${{ env.INSTALLER_PATH }}
+          body: |
+            ## SoundRecorder v${{ inputs.version }}
