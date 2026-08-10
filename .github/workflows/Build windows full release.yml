@@ -11,6 +11,7 @@ permissions:
 env:
   AUDIO_ENGINE_DIR: native/audio_engine
   ISS_PATH: build.iss
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build-windows:
