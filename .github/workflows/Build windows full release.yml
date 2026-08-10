@@ -1,6 +1,6 @@
 # @format
 
-name: Build Windows Full Release (Installer + Portable)
+name: Build Windows Release (Installer + Portable)
 
 on:
   workflow_dispatch:
